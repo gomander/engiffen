@@ -1,13 +1,14 @@
 [package]
-name = "engiffen"
+name = "gomander-engiffen"
 version = "0.8.2"
-authors = ["Jesse Bees <jesse@toomanybees.com>"]
+authors = ["Jesse Bees <jesse@toomanybees.com>", "Gunnar Omander <gunnar@gomander.dev>"]
 description = """
 Encodes GIF images from sequences of images. Includes an installable
 command line bin as well as the library.
+Forked from https://github.com/TooManyBees/engiffen
 """
-homepage = "https://github.com/TooManyBees/engiffen"
-repository = "https://github.com/TooManyBees/engiffen"
+homepage = "https://github.com/gomander/engiffen"
+repository = "https://github.com/gomander/engiffen"
 readme = "README.md"
 documentation = "https://docs.rs/engiffen"
 keywords = ["gif", "stream", "image", "cli"]
