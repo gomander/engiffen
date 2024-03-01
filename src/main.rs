@@ -42,7 +42,7 @@ impl fmt::Display for RuntimeError {
     }
 }
 
-fn run_engiffen(args: &Args) -> Result<((Option<String>, Duration)), RuntimeError> {
+fn run_engiffen(args: &Args) -> Result<(Option<String>, Duration), RuntimeError> {
     let mut source_images: Vec<_> = match args.source {
         SourceImages::StartEnd(ref dir, ref start_path, ref end_path) => {
             let start_string = start_path.as_os_str();
@@ -62,7 +62,7 @@ fn run_engiffen(args: &Args) -> Result<((Option<String>, Duration)), RuntimeErro
             .map(|e| e.path())
             .collect()
         },
-        SourceImages::List(ref list) => list.into_iter().map(PathBuf::from).collect(),
+        SourceImages::List(ref list) => list.iter().map(PathBuf::from).collect(),
         #[cfg(feature = "globbing")]
         SourceImages::Glob(ref string) => {
             let paths: Vec<_> = glob(string).expect("glob parsing failed :(")

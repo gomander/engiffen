@@ -31,7 +31,7 @@ fn ms(duration: Instant) -> u64 {
     duration.as_secs() * 1000 + duration.subsec_nanos() as u64 / 1000000
 }
 
-type RGBA = [u8; 4];
+type Rgba = [u8; 4];
 
 /// A color quantizing strategy.
 ///
@@ -67,7 +67,7 @@ pub enum Quantizer {
 /// disk through the `load_image` or `load_images` functions, its path property
 /// contains the path used to read it from disk.
 pub struct Image {
-    pub pixels: Vec<RGBA>,
+    pub pixels: Vec<Rgba>,
     pub width: u32,
     pub height: u32,
 }
@@ -168,12 +168,14 @@ impl Gif {
         let mut encoder = Encoder::new(&mut out, self.width, self.height, &self.palette)?;
         encoder.set(Repeat::Infinite)?;
         for img in &self.images {
-            let mut frame = Frame::default();
-            frame.delay = self.delay / 10;
-            frame.width = self.width;
-            frame.height = self.height;
-            frame.buffer = Cow::Borrowed(&*img);
-            frame.transparent = self.transparency;
+            let frame = Frame::<'_> {
+                delay: self.delay / 10,
+                width: self.width,
+                height: self.height,
+                buffer: Cow::Borrowed(img),
+                transparent: self.transparency,
+                ..Default::default()
+            };
             encoder.write_frame(&frame)?;
         }
         Ok(())
@@ -199,12 +201,12 @@ impl Gif {
 pub fn load_image<P>(path: P) -> Result<Image, Error>
     where P: AsRef<Path> {
     let img = image::open(&path)?;
-    let mut pixels: Vec<RGBA> = Vec::with_capacity(0);
+    let mut pixels: Vec<Rgba> = Vec::with_capacity(0);
     for (_, _, px) in img.pixels() {
         pixels.push(px.data);
     }
     Ok(Image {
-        pixels: pixels,
+        pixels,
         width: img.width(),
         height: img.height(),
     })
@@ -226,7 +228,7 @@ pub fn load_image<P>(path: P) -> Result<Image, Error>
 pub fn load_images<P>(paths: &[P]) -> Vec<Image>
     where P: AsRef<Path> {
     paths.iter()
-        .map(|path| load_image(path))
+        .map(load_image)
         .filter_map(|img| img.ok())
         .collect()
 }
@@ -258,7 +260,7 @@ pub fn engiffen(imgs: &[Image], fps: usize, quantizer: Quantizer) -> Result<Gif,
     #[cfg(feature = "debug-stderr")] eprintln!("Engiffening {} images", imgs.len());
 
     let (width, height) = {
-        let ref first = imgs[0];
+        let first = &imgs[0];
         let first_dimensions = (first.width, first.height);
         for img in imgs.iter() {
             let other_dimensions = (img.width, img.height);
@@ -270,19 +272,19 @@ pub fn engiffen(imgs: &[Image], fps: usize, quantizer: Quantizer) -> Result<Gif,
     };
 
     let (palette, palettized_imgs, transparency) = match quantizer {
-        Quantizer::NeuQuant(sample_rate) => neuquant_palettize(&imgs, sample_rate, width, height),
-        Quantizer::Naive => naive_palettize(&imgs),
+        Quantizer::NeuQuant(sample_rate) => neuquant_palettize(imgs, sample_rate, width, height),
+        Quantizer::Naive => naive_palettize(imgs),
     };
 
     let delay = (1000 / fps) as u16;
 
     Ok(Gif {
-        palette: palette,
-        transparency: transparency,
+        palette,
+        transparency,
         width: width as u16,
         height: height as u16,
         images: palettized_imgs,
-        delay: delay,
+        delay,
     })
 }
 
@@ -295,10 +297,8 @@ fn neuquant_palettize(imgs: &[Image], sample_rate: u32, width: u32, height: u32)
     let colors: Vec<u8> = imgs.par_iter().map(|img| {
         let mut temp: Vec<_> = Vec::with_capacity(image_len);
         for (n, px) in img.pixels.iter().enumerate() {
-            if sample_rate > 1 {
-                if n % sample_rate != 0 || (n / width) % sample_rate != 0 {
-                    continue;
-                }
+            if sample_rate > 1 && n % sample_rate != 0 || (n / width) % sample_rate != 0 {
+                continue;
             }
             if px[3] == 0 {
                 temp.extend_from_slice(&transparent_black);
@@ -322,7 +322,7 @@ fn neuquant_palettize(imgs: &[Image], sample_rate: u32, width: u32, height: u32)
 
     #[cfg(feature = "debug-stderr")] let time_map = Instant::now();
     let mut transparency = None;
-    let mut cache: FnvHashMap<RGBA, u8> = FnvHashMap::default();
+    let mut cache: FnvHashMap<Rgba, u8> = FnvHashMap::default();
     let palettized_imgs: Vec<Vec<u8>> = imgs.iter().map(|img| {
         img.pixels.iter().map(|px| {
             *cache.entry(*px).or_insert_with(|| {
@@ -342,14 +342,14 @@ fn neuquant_palettize(imgs: &[Image], sample_rate: u32, width: u32, height: u32)
 
 fn naive_palettize(imgs: &[Image]) -> (Vec<u8>, Vec<Vec<u8>>, Option<u8>) {
     #[cfg(feature = "debug-stderr")] let time_count = Instant::now();
-    let frequencies: FnvHashMap<RGBA, usize> = imgs.par_iter().map(|img| {
-        let mut fr: FnvHashMap<RGBA, usize> = FnvHashMap::default();
+    let frequencies: FnvHashMap<Rgba, usize> = imgs.par_iter().map(|img| {
+        let mut fr: FnvHashMap<Rgba, usize> = FnvHashMap::default();
         for pixel in img.pixels.iter() {
             let num = fr.entry(*pixel).or_insert(0);
             *num += 1;
         }
         fr
-    }).reduce(|| FnvHashMap::default(), |mut acc, fr| {
+    }).reduce(FnvHashMap::default, |mut acc, fr| {
         for (color, count) in fr {
             let num = acc.entry(color).or_insert(0);
             *num += count;
@@ -372,7 +372,7 @@ fn naive_palettize(imgs: &[Image]) -> (Vec<u8>, Vec<Vec<u8>>, Option<u8>) {
         (&sorted[..], &[] as &[_])
     };
 
-    let mut map: FnvHashMap<RGBA, u8> = FnvHashMap::default();
+    let mut map: FnvHashMap<Rgba, u8> = FnvHashMap::default();
     for (i, color) in palette.iter().enumerate() {
         map.insert(color.0, i as u8);
     }

@@ -73,17 +73,7 @@ impl fmt::Display for ArgsError {
 }
 
 impl error::Error for ArgsError {
-    fn description(&self) -> &str {
-        match *self {
-            ArgsError::Parse(ref err) => err.description(),
-            ArgsError::ParseInt(ref err) => err.description(),
-            #[cfg(feature = "globbing")] ArgsError::GlobPattern => "Bad glob pattern",
-            ArgsError::ImageRange(_) => "Bad image range",
-            ArgsError::DisplayHelp(_) => "Display help message"
-        }
-    }
-
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         match *self {
             ArgsError::Parse(ref err) => Some(err),
             ArgsError::ParseInt(ref err) => Some(err),
@@ -137,11 +127,11 @@ pub fn parse_args(args: &[String]) -> Result<Args, ArgsError> {
         match opt_str.as_str() {
             "reverse" | "rev" => modifiers.push(Modifier::Reverse),
             "shuffle" => modifiers.push(Modifier::Shuffle),
-            m @ _ => eprintln!("Ignoring unknown modifier `{}`", m),
+            m => eprintln!("Ignoring unknown modifier `{}`", m),
         }
     }
 
-    let out_file = matches.opt_str("o").map(|f| f.clone());
+    let out_file = matches.opt_str("o");
     let source = if matches.opt_present("r") {
         if matches.free.len() >= 2 {
             let (path_start, filename_start) = path_and_filename(&matches.free[0])?;
@@ -155,25 +145,23 @@ pub fn parse_args(args: &[String]) -> Result<Args, ArgsError> {
         } else {
             return Err(ArgsError::ImageRange("missing start and end filenames".to_string()));
         }
-    } else {
-        if matches.free.len() == 1 {
+    } else if matches.free.len() == 1 {
             #[cfg(feature = "globbing")]
             {
                 glob::Pattern::new(&matches.free[0])?;
                 Glob(matches.free[0].clone())
             }
             #[cfg(not(feature = "globbing"))] List(matches.free)
-        } else {
-            List(matches.free)
-        }
+    } else {
+        List(matches.free)
     };
 
     Ok(Args {
-        source: source,
-        fps: fps,
-        out_file: out_file,
-        quantizer: quantizer,
-        modifiers: modifiers,
+        source,
+        fps,
+        out_file,
+        quantizer,
+        modifiers,
     })
 }
 
