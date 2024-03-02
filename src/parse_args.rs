@@ -139,12 +139,11 @@ pub fn parse_args(args: &[String]) -> Result<Args, ArgsError> {
             if path_start != path_end {
                 return Err(ArgsError::ImageRange("start and end files are from different directories".to_string()));
             }
-            StartEnd(path_start, filename_start, filename_end)
+            StartEnd(path_start, filename_start, filename_end);
         } else if matches.free.len() == 1 {
             return Err(ArgsError::ImageRange("missing end filename".to_string()));
-        } else {
-            return Err(ArgsError::ImageRange("missing start and end filenames".to_string()));
         }
+        return Err(ArgsError::ImageRange("missing start and end filenames".to_string()));
     } else if matches.free.len() == 1 {
             #[cfg(feature = "globbing")]
             {
