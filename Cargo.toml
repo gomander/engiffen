@@ -1,6 +1,6 @@
 [package]
 name = "gomander-engiffen"
-version = "0.8.2"
+version = "0.8.3"
 authors = ["Jesse Bees <jesse@toomanybees.com>", "Gunnar Omander <gunnar@gomander.dev>"]
 description = """
 Encodes GIF images from sequences of images. Includes an installable
