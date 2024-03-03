@@ -15,7 +15,7 @@ extern crate rayon;
 use color_quant::NeuQuant;
 use fnv::FnvHashMap;
 use gif::{Encoder, Frame, Repeat, SetParameter};
-use image::GenericImage;
+use image::GenericImageView;
 use lab::Lab;
 use rayon::prelude::*;
 use std::borrow::Cow;
@@ -210,7 +210,7 @@ where
     let img = image::open(&path)?;
     let mut pixels: Vec<Rgba> = Vec::with_capacity(0);
     for (_, _, px) in img.pixels() {
-        pixels.push(px.data);
+        pixels.push(px.0);
     }
     Ok(Image {
         pixels,
