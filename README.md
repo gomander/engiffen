@@ -8,6 +8,10 @@ Generates gifs from image sequences.
 
 _Source frame, generated gif, and a gif from Photoshop_
 
+This repository is a fork of [engiffen](https://github.com/TooManyBees/engiffen) by [TooManyBees](https://github.com/TooManyBees).  
+I made this fork because the original repo is no longer maintained, and I was having trouble with peer dependencies when trying to use it,
+namely color_quant. All credit for the code goes to the original author, TooManyBees.
+
 # usage
 
 ## as binary
