@@ -1,11 +1,12 @@
 extern crate getopts;
-#[cfg(feature = "globbing")] extern crate glob;
+#[cfg(feature = "globbing")]
+extern crate glob;
 
 use getopts::Options;
-use std::path::{Path, PathBuf};
-use std::{error, fmt};
-use std::str::FromStr;
 use std;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
+use std::{error, fmt};
 
 use self::SourceImages::*;
 use engiffen::Quantizer;
@@ -14,13 +15,14 @@ use engiffen::Quantizer;
 pub enum SourceImages {
     StartEnd(PathBuf, PathBuf, PathBuf),
     List(Vec<String>),
-    #[cfg(feature = "globbing")] Glob(String),
+    #[cfg(feature = "globbing")]
+    Glob(String),
 }
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Modifier {
     Reverse,
-    Shuffle
+    Shuffle,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -36,7 +38,8 @@ pub struct Args {
 pub enum ArgsError {
     Parse(getopts::Fail),
     ParseInt(std::num::ParseIntError),
-    #[cfg(feature = "globbing")] GlobPattern,
+    #[cfg(feature = "globbing")]
+    GlobPattern,
     ImageRange(String),
     DisplayHelp(String),
 }
@@ -65,7 +68,8 @@ impl fmt::Display for ArgsError {
         match *self {
             ArgsError::Parse(ref err) => write!(f, "Options parse error: {}", err),
             ArgsError::ParseInt(_) => write!(f, "Unable to parse argument as an integer"),
-            #[cfg(feature = "globbing")] ArgsError::GlobPattern => write!(f, "Unable to parse glob pattern"),
+            #[cfg(feature = "globbing")]
+            ArgsError::GlobPattern => write!(f, "Unable to parse glob pattern"),
             ArgsError::ImageRange(ref s) => write!(f, "Bad image range: {}", s),
             ArgsError::DisplayHelp(ref msg) => write!(f, "{}", msg),
         }
@@ -77,7 +81,8 @@ impl error::Error for ArgsError {
         match *self {
             ArgsError::Parse(ref err) => Some(err),
             ArgsError::ParseInt(ref err) => Some(err),
-            #[cfg(feature = "globbing")] ArgsError::GlobPattern => None,
+            #[cfg(feature = "globbing")]
+            ArgsError::GlobPattern => None,
             ArgsError::ImageRange(_) => None,
             ArgsError::DisplayHelp(_) => None,
         }
@@ -90,10 +95,25 @@ pub fn parse_args(args: &[String]) -> Result<Args, ArgsError> {
     let mut opts = Options::new();
     opts.optopt("o", "outfile", "engiffen to this filename", "FILE");
     opts.optopt("f", "framerate", "frames per second", "30");
-    opts.optopt("s", "sample-rate", "reduces how many pixels are analyzed when generating palette, higher means faster", "2");
-    opts.optopt("q", "quantizer", "pick quantizer algorithm (default: neuquant)", "naive");
+    opts.optopt(
+        "s",
+        "sample-rate",
+        "reduces how many pixels are analyzed when generating palette, higher means faster",
+        "2",
+    );
+    opts.optopt(
+        "q",
+        "quantizer",
+        "pick quantizer algorithm (default: neuquant)",
+        "naive",
+    );
     opts.optflag("r", "range", "arguments specify start and end images");
-    opts.optmulti("n", "reorder", "reorder frames before processing", "reverse");
+    opts.optmulti(
+        "n",
+        "reorder",
+        "reorder frames before processing",
+        "reverse",
+    );
     opts.optflag("h", "help", "display this help");
 
     let matches = opts.parse(&args[1..])?;
@@ -110,9 +130,7 @@ pub fn parse_args(args: &[String]) -> Result<Args, ArgsError> {
 
     let quantizer = match matches.opt_str("q").map(|s| s.to_lowercase()) {
         Some(ref s) if s == "naive" => Quantizer::Naive,
-        Some(_) => {
-            Quantizer::NeuQuant(sample_rate)
-        },
+        Some(_) => Quantizer::NeuQuant(sample_rate),
         None => Quantizer::NeuQuant(sample_rate),
     };
 
@@ -137,20 +155,25 @@ pub fn parse_args(args: &[String]) -> Result<Args, ArgsError> {
             let (path_start, filename_start) = path_and_filename(&matches.free[0])?;
             let (path_end, filename_end) = path_and_filename(&matches.free[1])?;
             if path_start != path_end {
-                return Err(ArgsError::ImageRange("start and end files are from different directories".to_string()));
+                return Err(ArgsError::ImageRange(
+                    "start and end files are from different directories".to_string(),
+                ));
             }
             StartEnd(path_start, filename_start, filename_end);
         } else if matches.free.len() == 1 {
             return Err(ArgsError::ImageRange("missing end filename".to_string()));
         }
-        return Err(ArgsError::ImageRange("missing start and end filenames".to_string()));
+        return Err(ArgsError::ImageRange(
+            "missing start and end filenames".to_string(),
+        ));
     } else if matches.free.len() == 1 {
-            #[cfg(feature = "globbing")]
-            {
-                glob::Pattern::new(&matches.free[0])?;
-                Glob(matches.free[0].clone())
-            }
-            #[cfg(not(feature = "globbing"))] List(matches.free)
+        #[cfg(feature = "globbing")]
+        {
+            glob::Pattern::new(&matches.free[0])?;
+            Glob(matches.free[0].clone())
+        }
+        #[cfg(not(feature = "globbing"))]
+        List(matches.free)
     } else {
         List(matches.free)
     };
@@ -173,20 +196,23 @@ fn path_and_filename(input: &str) -> Result<(PathBuf, PathBuf), ArgsError> {
             } else {
                 s
             }
-        },
-        None => Path::new(".")
+        }
+        None => Path::new("."),
     };
     if let Some(filename) = p.file_name() {
         Ok((parent.to_owned(), PathBuf::from(filename)))
     } else {
-        Err(ArgsError::ImageRange(format!("Invalid filename {:?}", input)))
+        Err(ArgsError::ImageRange(format!(
+            "Invalid filename {:?}",
+            input
+        )))
     }
 }
 
 #[cfg(test)]
 #[allow(unused_must_use)]
 mod tests {
-    use super::{parse_args, SourceImages, ArgsError, Args, Quantizer};
+    use super::{parse_args, Args, ArgsError, Quantizer, SourceImages};
     use std::path::PathBuf;
     use std::str::FromStr;
 
@@ -266,7 +292,9 @@ mod tests {
 
     #[test]
     fn test_file_range_remote_directory() {
-        let args = parse_args(&make_args("engiffen -r ../dir/thing001.jpg ../dir/thing010.jpg"));
+        let args = parse_args(&make_args(
+            "engiffen -r ../dir/thing001.jpg ../dir/thing010.jpg",
+        ));
         assert!(args.is_ok());
         assert_eq!(
             args.unwrap().source,
@@ -281,19 +309,28 @@ mod tests {
     #[test]
     fn test_file_range_different_directories() {
         let args = parse_args(&make_args("engiffen -r ./thing001.jpg ../thing010.jpg"));
-        assert_err_eq(args, ArgsError::ImageRange("start and end files are from different directories".to_string()));
+        assert_err_eq(
+            args,
+            ArgsError::ImageRange("start and end files are from different directories".to_string()),
+        );
     }
 
     #[test]
     fn test_file_range_incomplete() {
         let args = parse_args(&make_args("engiffen -r ./thing001.jpg"));
-        assert_err_eq(args, ArgsError::ImageRange("missing end filename".to_string()));
+        assert_err_eq(
+            args,
+            ArgsError::ImageRange("missing end filename".to_string()),
+        );
     }
 
     #[test]
     fn test_file_range_missing() {
         let args = parse_args(&make_args("engiffen -r"));
-        assert_err_eq(args, ArgsError::ImageRange("missing start and end filenames".to_string()));
+        assert_err_eq(
+            args,
+            ArgsError::ImageRange("missing start and end filenames".to_string()),
+        );
     }
 
     #[test]

@@ -5,25 +5,26 @@
 
 #![doc(html_root_url = "https://docs.rs/engiffen/0.8.1")]
 
-extern crate image;
-extern crate gif;
 extern crate color_quant;
+extern crate fnv;
+extern crate gif;
+extern crate image;
 extern crate lab;
 extern crate rayon;
-extern crate fnv;
 
-use std::io;
-use std::{error, fmt, f32};
-use std::borrow::Cow;
-use std::path::Path;
-use image::GenericImage;
-use gif::{Frame, Encoder, Repeat, SetParameter};
 use color_quant::NeuQuant;
+use fnv::FnvHashMap;
+use gif::{Encoder, Frame, Repeat, SetParameter};
+use image::GenericImage;
 use lab::Lab;
 use rayon::prelude::*;
-use fnv::FnvHashMap;
+use std::borrow::Cow;
+use std::io;
+use std::path::Path;
+use std::{error, f32, fmt};
 
-#[cfg(feature = "debug-stderr")] use std::time::{Instant};
+#[cfg(feature = "debug-stderr")]
+use std::time::Instant;
 
 #[cfg(feature = "debug-stderr")]
 fn ms(duration: Instant) -> u64 {
@@ -74,7 +75,11 @@ pub struct Image {
 
 impl fmt::Debug for Image {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Image {{ dimensions: {} x {} }}", self.width, self.height)
+        write!(
+            f,
+            "Image {{ dimensions: {} x {} }}",
+            self.width, self.height
+        )
     }
 }
 
@@ -199,7 +204,9 @@ impl Gif {
 ///
 /// Returns an error if the path can't be read or if the image can't be decoded
 pub fn load_image<P>(path: P) -> Result<Image, Error>
-    where P: AsRef<Path> {
+where
+    P: AsRef<Path>,
+{
     let img = image::open(&path)?;
     let mut pixels: Vec<Rgba> = Vec::with_capacity(0);
     for (_, _, px) in img.pixels() {
@@ -226,8 +233,11 @@ pub fn load_image<P>(path: P) -> Result<Image, Error>
 ///
 /// Skips images that fail to load. If all images fail, returns an empty vector.
 pub fn load_images<P>(paths: &[P]) -> Vec<Image>
-    where P: AsRef<Path> {
-    paths.iter()
+where
+    P: AsRef<Path>,
+{
+    paths
+        .iter()
         .map(load_image)
         .filter_map(|img| img.ok())
         .collect()
@@ -257,7 +267,8 @@ pub fn engiffen(imgs: &[Image], fps: usize, quantizer: Quantizer) -> Result<Gif,
     if imgs.is_empty() {
         return Err(Error::NoImages);
     }
-    #[cfg(feature = "debug-stderr")] eprintln!("Engiffening {} images", imgs.len());
+    #[cfg(feature = "debug-stderr")]
+    eprintln!("Engiffening {} images", imgs.len());
 
     let (width, height) = {
         let first = &imgs[0];
@@ -288,52 +299,76 @@ pub fn engiffen(imgs: &[Image], fps: usize, quantizer: Quantizer) -> Result<Gif,
     })
 }
 
-fn neuquant_palettize(imgs: &[Image], sample_rate: u32, width: u32, height: u32) -> (Vec<u8>, Vec<Vec<u8>>, Option<u8>) {
+fn neuquant_palettize(
+    imgs: &[Image],
+    sample_rate: u32,
+    width: u32,
+    height: u32,
+) -> (Vec<u8>, Vec<Vec<u8>>, Option<u8>) {
     let image_len = (width * height * 4 / sample_rate / sample_rate) as usize;
     let width = width as usize;
     let sample_rate = sample_rate as usize;
     let transparent_black = [0u8; 4];
-    #[cfg(feature = "debug-stderr")] let time_push = Instant::now();
-    let colors: Vec<u8> = imgs.par_iter().map(|img| {
-        let mut temp: Vec<_> = Vec::with_capacity(image_len);
-        for (n, px) in img.pixels.iter().enumerate() {
-            if sample_rate > 1 && n % sample_rate != 0 || (n / width) % sample_rate != 0 {
-                continue;
-            }
-            if px[3] == 0 {
-                temp.extend_from_slice(&transparent_black);
-            } else {
-                temp.extend_from_slice(&px[..3]);
-                temp.push(255);
-            }
-        }
-        temp
-    }).reduce(|| Vec::with_capacity(image_len * imgs.len()), |mut acc, img| {
-        acc.extend_from_slice(&img);
-        acc
-    });
     #[cfg(feature = "debug-stderr")]
-    eprintln!("Neuquant: Concatenated {} bytes in {} ms.", colors.len(), ms(time_push));
+    let time_push = Instant::now();
+    let colors: Vec<u8> = imgs
+        .par_iter()
+        .map(|img| {
+            let mut temp: Vec<_> = Vec::with_capacity(image_len);
+            for (n, px) in img.pixels.iter().enumerate() {
+                if sample_rate > 1 && n % sample_rate != 0 || (n / width) % sample_rate != 0 {
+                    continue;
+                }
+                if px[3] == 0 {
+                    temp.extend_from_slice(&transparent_black);
+                } else {
+                    temp.extend_from_slice(&px[..3]);
+                    temp.push(255);
+                }
+            }
+            temp
+        })
+        .reduce(
+            || Vec::with_capacity(image_len * imgs.len()),
+            |mut acc, img| {
+                acc.extend_from_slice(&img);
+                acc
+            },
+        );
+    #[cfg(feature = "debug-stderr")]
+    eprintln!(
+        "Neuquant: Concatenated {} bytes in {} ms.",
+        colors.len(),
+        ms(time_push)
+    );
 
-    #[cfg(feature = "debug-stderr")] let time_quant = Instant::now();
+    #[cfg(feature = "debug-stderr")]
+    let time_quant = Instant::now();
     let quant = NeuQuant::new(10, 256, &colors);
     #[cfg(feature = "debug-stderr")]
     eprintln!("Neuquant: Computed palette in {} ms.", ms(time_quant));
 
-    #[cfg(feature = "debug-stderr")] let time_map = Instant::now();
+    #[cfg(feature = "debug-stderr")]
+    let time_map = Instant::now();
     let mut transparency = None;
     let mut cache: FnvHashMap<Rgba, u8> = FnvHashMap::default();
-    let palettized_imgs: Vec<Vec<u8>> = imgs.iter().map(|img| {
-        img.pixels.iter().map(|px| {
-            *cache.entry(*px).or_insert_with(|| {
-                let idx = quant.index_of(px) as u8;
-                if transparency.is_none() && px[3] == 0 {
-                    transparency = Some(idx);
-                }
-                idx
-            })
-        }).collect()
-    }).collect();
+    let palettized_imgs: Vec<Vec<u8>> = imgs
+        .iter()
+        .map(|img| {
+            img.pixels
+                .iter()
+                .map(|px| {
+                    *cache.entry(*px).or_insert_with(|| {
+                        let idx = quant.index_of(px) as u8;
+                        if transparency.is_none() && px[3] == 0 {
+                            transparency = Some(idx);
+                        }
+                        idx
+                    })
+                })
+                .collect()
+        })
+        .collect();
     #[cfg(feature = "debug-stderr")]
     eprintln!("Neuquant: Mapped pixels to palette in {} ms.", ms(time_map));
 
@@ -341,30 +376,35 @@ fn neuquant_palettize(imgs: &[Image], sample_rate: u32, width: u32, height: u32)
 }
 
 fn naive_palettize(imgs: &[Image]) -> (Vec<u8>, Vec<Vec<u8>>, Option<u8>) {
-    #[cfg(feature = "debug-stderr")] let time_count = Instant::now();
-    let frequencies: FnvHashMap<Rgba, usize> = imgs.par_iter().map(|img| {
-        let mut fr: FnvHashMap<Rgba, usize> = FnvHashMap::default();
-        for pixel in img.pixels.iter() {
-            let num = fr.entry(*pixel).or_insert(0);
-            *num += 1;
-        }
-        fr
-    }).reduce(FnvHashMap::default, |mut acc, fr| {
-        for (color, count) in fr {
-            let num = acc.entry(color).or_insert(0);
-            *num += count;
-        }
-        acc
-    });
+    #[cfg(feature = "debug-stderr")]
+    let time_count = Instant::now();
+    let frequencies: FnvHashMap<Rgba, usize> = imgs
+        .par_iter()
+        .map(|img| {
+            let mut fr: FnvHashMap<Rgba, usize> = FnvHashMap::default();
+            for pixel in img.pixels.iter() {
+                let num = fr.entry(*pixel).or_insert(0);
+                *num += 1;
+            }
+            fr
+        })
+        .reduce(FnvHashMap::default, |mut acc, fr| {
+            for (color, count) in fr {
+                let num = acc.entry(color).or_insert(0);
+                *num += count;
+            }
+            acc
+        });
     #[cfg(feature = "debug-stderr")]
     eprintln!("Naive: Counted color frequencies in {} ms", ms(time_count));
-    #[cfg(feature = "debug-stderr")] let time_palette = Instant::now();
-    let mut sorted_frequencies = frequencies.into_iter()
-        .collect::<Vec<_>>();
+    #[cfg(feature = "debug-stderr")]
+    let time_palette = Instant::now();
+    let mut sorted_frequencies = frequencies.into_iter().collect::<Vec<_>>();
     sorted_frequencies.sort_by(|a, b| b.1.cmp(&a.1));
-    let sorted = sorted_frequencies.into_iter().map(|c| {
-        (c.0, Lab::from_rgba(&c.0))
-    }).collect::<Vec<_>>();
+    let sorted = sorted_frequencies
+        .into_iter()
+        .map(|c| (c.0, Lab::from_rgba(&c.0)))
+        .collect::<Vec<_>>();
 
     let (palette, rest) = if sorted.len() > 256 {
         (&sorted[..256], &sorted[256..])
@@ -377,27 +417,41 @@ fn naive_palettize(imgs: &[Image]) -> (Vec<u8>, Vec<Vec<u8>>, Option<u8>) {
         map.insert(color.0, i as u8);
     }
     for color in rest {
-        let closest_index = palette.iter().enumerate().fold((0, f32::INFINITY), |closest, (idx, p)| {
-            let dist = p.1.squared_distance(&color.1);
-            if closest.1 < dist {
-                closest
-            } else {
-                (idx, dist)
-            }
-        }).0;
+        let closest_index = palette
+            .iter()
+            .enumerate()
+            .fold((0, f32::INFINITY), |closest, (idx, p)| {
+                let dist = p.1.squared_distance(&color.1);
+                if closest.1 < dist {
+                    closest
+                } else {
+                    (idx, dist)
+                }
+            })
+            .0;
         let closest_rgb = palette[closest_index].0;
-        let index = *map.get(&closest_rgb).expect("A color we assigned to the palette is somehow missing from the palette index map.");
+        let index = *map.get(&closest_rgb).expect(
+            "A color we assigned to the palette is somehow missing from the palette index map.",
+        );
         map.insert(color.0, index);
     }
     #[cfg(feature = "debug-stderr")]
     eprintln!("Naive: Computed palette in {} ms.", ms(time_palette));
 
-    #[cfg(feature = "debug-stderr")]let time_index = Instant::now();
-    let palettized_imgs: Vec<Vec<u8>> = imgs.par_iter().map(|img| {
-        img.pixels.iter().map(|px| {
-            *map.get(px).expect("A color in an image was not added to the palette map.")
-        }).collect()
-    }).collect();
+    #[cfg(feature = "debug-stderr")]
+    let time_index = Instant::now();
+    let palettized_imgs: Vec<Vec<u8>> = imgs
+        .par_iter()
+        .map(|img| {
+            img.pixels
+                .iter()
+                .map(|px| {
+                    *map.get(px)
+                        .expect("A color in an image was not added to the palette map.")
+                })
+                .collect()
+        })
+        .collect();
     #[cfg(feature = "debug-stderr")]
     eprintln!("Naive: Mapped pixels to palette in {} ms", ms(time_index));
 
@@ -412,15 +466,16 @@ fn naive_palettize(imgs: &[Image]) -> (Vec<u8>, Vec<Vec<u8>>, Option<u8>) {
 #[cfg(test)]
 #[allow(unused_must_use)]
 mod tests {
-    use super::{load_image, engiffen, Error, Quantizer};
+    use super::{engiffen, load_image, Error, Quantizer};
     use std::fs::{read_dir, File};
 
     #[test]
     fn test_error_on_size_mismatch() {
-        let imgs: Vec<_> = read_dir("tests/mismatched_size").unwrap()
-        .map(|e| e.unwrap().path())
-        .map(|path| load_image(&path).unwrap())
-        .collect();
+        let imgs: Vec<_> = read_dir("tests/mismatched_size")
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .map(|path| load_image(&path).unwrap())
+            .collect();
 
         let res = engiffen(&imgs, 30, Quantizer::NeuQuant(1));
 
@@ -428,15 +483,17 @@ mod tests {
         match res {
             Err(Error::Mismatch(one, another)) => {
                 assert_eq!((one, another), ((100, 100), (50, 50)));
-            },
+            }
             _ => unreachable!(),
         }
     }
 
-    #[test] #[ignore]
+    #[test]
+    #[ignore]
     fn test_compress_palette() {
         // This takes a while to run when not in --release
-        let imgs: Vec<_> = read_dir("tests/ball").unwrap()
+        let imgs: Vec<_> = read_dir("tests/ball")
+            .unwrap()
             .map(|e| e.unwrap().path())
             .filter(|path| match path.extension() {
                 Some(ext) if ext == "bmp" => true,
@@ -453,9 +510,11 @@ mod tests {
         };
     }
 
-    #[test] #[ignore]
+    #[test]
+    #[ignore]
     fn test_simple_paletted_gif() {
-        let imgs: Vec<_> = read_dir("tests/shrug").unwrap()
+        let imgs: Vec<_> = read_dir("tests/shrug")
+            .unwrap()
             .map(|e| e.unwrap().path())
             .filter(|path| match path.extension() {
                 Some(ext) if ext == "tga" => true,
