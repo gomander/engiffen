@@ -14,7 +14,7 @@ extern crate rayon;
 
 use color_quant::NeuQuant;
 use fnv::FnvHashMap;
-use gif::{Encoder, Frame, Repeat, SetParameter};
+use gif::{Encoder, Frame, Repeat};
 use image::GenericImageView;
 use lab::Lab;
 use rayon::prelude::*;
@@ -89,6 +89,7 @@ pub enum Error {
     Mismatch((u32, u32), (u32, u32)),
     ImageLoad(image::ImageError),
     ImageWrite(io::Error),
+    Encode(gif::EncodingError),
 }
 
 impl From<image::ImageError> for Error {
@@ -103,6 +104,12 @@ impl From<io::Error> for Error {
     }
 }
 
+impl From<gif::EncodingError> for Error {
+    fn from(err: gif::EncodingError) -> Error {
+        Error::Encode(err)
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -110,6 +117,7 @@ impl fmt::Display for Error {
             Error::Mismatch(_, _) => write!(f, "Frames don't have the same dimensions"),
             Error::ImageLoad(ref e) => write!(f, "Image load error: {}", e),
             Error::ImageWrite(ref e) => write!(f, "Image write error: {}", e),
+            Error::Encode(ref e) => write!(f, "Gif encoding error: {}", e),
         }
     }
 }
@@ -121,6 +129,7 @@ impl error::Error for Error {
             Error::Mismatch(_, _) => "Frames don't have the same dimensions",
             Error::ImageLoad(_) => "Unable to load image",
             Error::ImageWrite(_) => "Unable to write image",
+            Error::Encode(_) => "Unable to encode gif",
         }
     }
 }
@@ -173,7 +182,7 @@ impl Gif {
     /// Returns the `std::io::Result` of the underlying `write` function calls.
     pub fn write<W: io::Write>(&self, mut out: &mut W) -> Result<(), Error> {
         let mut encoder = Encoder::new(&mut out, self.width, self.height, &self.palette)?;
-        encoder.set(self.loops.map_or(Repeat::Infinite, |l| Repeat::Finite(l.into())))?;
+        encoder.set_repeat(self.loops.map_or(Repeat::Infinite, Repeat::Finite))?;
         for img in &self.images {
             let frame = Frame::<'_> {
                 delay: self.delay / 10,
