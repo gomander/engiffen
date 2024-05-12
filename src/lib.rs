@@ -133,18 +133,20 @@ pub struct Gif {
     pub width: u16,
     pub height: u16,
     pub images: Vec<Vec<u8>>,
+    pub loops: Option<u16>,
     pub delay: u16,
 }
 
 impl fmt::Debug for Gif {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Gif {{ palette: Vec<u8 x {:?}>, transparency: {:?}, width: {:?}, height: {:?}, images: Vec<Vec<u8> x {:?}>, delay: {:?} }}",
+        write!(f, "Gif {{ palette: Vec<u8 x {:?}>, transparency: {:?}, width: {:?}, height: {:?}, images: Vec<Vec<u8> x {:?}>, delay: {:?}, loops: {:?} }}",
             self.palette.len(),
             self.transparency,
             self.width,
             self.height,
             self.images.len(),
-            self.delay
+            self.delay,
+            self.loops
         )
     }
 }
@@ -171,7 +173,12 @@ impl Gif {
     /// Returns the `std::io::Result` of the underlying `write` function calls.
     pub fn write<W: io::Write>(&self, mut out: &mut W) -> Result<(), Error> {
         let mut encoder = Encoder::new(&mut out, self.width, self.height, &self.palette)?;
-        encoder.set(Repeat::Infinite)?;
+        let repeat = self.loops.unwrap_or(0);
+        if repeat > 0 {
+            encoder.set(Repeat::Finite(repeat))?;
+        } else {
+            encoder.set(Repeat::Infinite)?;
+        }
         for img in &self.images {
             let frame = Frame::<'_> {
                 delay: self.delay / 10,
@@ -263,7 +270,12 @@ where
 ///
 /// If any image dimensions differ, this function will return an Error::Mismatch
 /// containing tuples of the conflicting image dimensions.
-pub fn engiffen(imgs: &[Image], fps: usize, quantizer: Quantizer) -> Result<Gif, Error> {
+pub fn engiffen(
+    imgs: &[Image],
+    fps: usize,
+    quantizer: Quantizer,
+    loops: Option<u16>,
+) -> Result<Gif, Error> {
     if imgs.is_empty() {
         return Err(Error::NoImages);
     }
@@ -295,6 +307,7 @@ pub fn engiffen(imgs: &[Image], fps: usize, quantizer: Quantizer) -> Result<Gif,
         width: width as u16,
         height: height as u16,
         images: palettized_imgs,
+        loops,
         delay,
     })
 }
@@ -477,7 +490,7 @@ mod tests {
             .map(|path| load_image(&path).unwrap())
             .collect();
 
-        let res = engiffen(&imgs, 30, Quantizer::NeuQuant(1));
+        let res = engiffen(&imgs, 30, Quantizer::NeuQuant(1), None);
 
         assert!(res.is_err());
         match res {
@@ -503,7 +516,7 @@ mod tests {
             .collect();
 
         let mut out = File::create("tests/ball.gif").unwrap();
-        let gif = engiffen(&imgs, 10, Quantizer::NeuQuant(2));
+        let gif = engiffen(&imgs, 10, Quantizer::NeuQuant(2), None);
         match gif {
             Ok(gif) => gif.write(&mut out),
             Err(_) => panic!("Test should have successfully made a gif."),
@@ -524,7 +537,7 @@ mod tests {
             .collect();
 
         let mut out = File::create("tests/shrug.gif").unwrap();
-        let gif = engiffen(&imgs, 30, Quantizer::NeuQuant(2));
+        let gif = engiffen(&imgs, 30, Quantizer::NeuQuant(2), None);
         match gif {
             Ok(gif) => gif.write(&mut out),
             Err(_) => panic!("Test should have successfully made a gif."),

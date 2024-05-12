@@ -83,7 +83,7 @@ fn run_engiffen(args: &Args) -> Result<(Option<String>, Duration), RuntimeError>
     let imgs = engiffen::load_images(&source_images);
 
     let now = Instant::now();
-    let gif = engiffen::engiffen(&imgs, args.fps, args.quantizer)?;
+    let gif = engiffen::engiffen(&imgs, args.fps, args.quantizer, args.loop_count)?;
     match args.out_file {
         Some(ref filename) => {
             let mut file = BufWriter::new(

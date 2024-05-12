@@ -32,6 +32,7 @@ pub struct Args {
     pub out_file: Option<String>,
     pub quantizer: Quantizer,
     pub modifiers: Vec<Modifier>,
+    pub loop_count: Option<u16>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -107,6 +108,7 @@ pub fn parse_args(args: &[String]) -> Result<Args, ArgsError> {
         "pick quantizer algorithm (default: neuquant)",
         "naive",
     );
+    opts.optopt("l", "loops", "number of times to loop the gif", "infinite");
     opts.optflag("r", "range", "arguments specify start and end images");
     opts.optmulti(
         "n",
@@ -138,6 +140,15 @@ pub fn parse_args(args: &[String]) -> Result<Args, ArgsError> {
         usize::from_str(&fps_str)?
     } else {
         30
+    };
+
+    let loop_count: Option<u16> = if let Some(loop_str) = matches.opt_str("l") {
+        match loop_str.parse::<u16>() {
+            Ok(val) if val > 0 => Some(val),
+            _ => None,
+        }
+    } else {
+        None
     };
 
     let mut modifiers = vec![];
@@ -184,6 +195,7 @@ pub fn parse_args(args: &[String]) -> Result<Args, ArgsError> {
         out_file,
         quantizer,
         modifiers,
+        loop_count,
     })
 }
 

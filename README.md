@@ -8,9 +8,11 @@ Generates gifs from image sequences.
 
 _Source frame, generated gif, and a gif from Photoshop_
 
-This repository is a fork of [engiffen](https://github.com/TooManyBees/engiffen) by [TooManyBees](https://github.com/TooManyBees).  
-I made this fork because the original repo is no longer maintained, and I was having trouble with peer dependencies when trying to use it,
-namely color_quant. All credit for the code goes to the original author, TooManyBees.
+This repository is a fork of [engiffen](https://github.com/TooManyBees/engiffen) by
+[TooManyBees](https://github.com/TooManyBees).  
+I made this fork because the original repo is no longer maintained, and I was having trouble with
+peer dependencies when trying to use it, namely color_quant. All credit for the code goes to the
+original author, TooManyBees.
 
 # usage
 
@@ -57,7 +59,7 @@ let images = load_images(&paths);
 let mut output = File::create("output.gif")?;
 
 // encode an animated gif at 10 frames per second
-let gif = engiffen(&images, 10, Quantizer::Naive)?;
+let gif = engiffen(&images, 10, Quantizer::Naive, None)?;
 gif.write(&mut output);
 ```
 
@@ -66,7 +68,7 @@ gif.write(&mut output);
 // when computing the gif's palette. This value reduces the amount of
 // sampling work to 1/9th of what it normally would, by only sampling
 // every 3rd pixel on every 3rd row (i.e. pixels lying on a 3x3 grid).
-let gif = engiffen(&images, 10, Quantizer::NeuQuant(3));
+let gif = engiffen(&images, 10, Quantizer::NeuQuant(3), None);
 ```
 
 # debug output
@@ -99,12 +101,6 @@ cargo test --release -- --ignored
 
   Accept a stream of frames from a server to process individually as they arrive. Put off sorting the final palette and compiling the gif until finished.
 
-## Contributing & Contact
-
-Github doesn't like to alert me to notifications, so hit me up on Twitter [@toomanybees](https://twitter.com/toomanybees) for a quicker response.
+## Contributing
 
 PRs and Issues are always welcome.
-
-## Anything else?
-
-![shrug](tests/shrug.gif)
