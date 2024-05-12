@@ -173,12 +173,7 @@ impl Gif {
     /// Returns the `std::io::Result` of the underlying `write` function calls.
     pub fn write<W: io::Write>(&self, mut out: &mut W) -> Result<(), Error> {
         let mut encoder = Encoder::new(&mut out, self.width, self.height, &self.palette)?;
-        let repeat = self.loops.unwrap_or(0);
-        if repeat > 0 {
-            encoder.set(Repeat::Finite(repeat))?;
-        } else {
-            encoder.set(Repeat::Infinite)?;
-        }
+        encoder.set(self.loops.map_or(Repeat::Infinite, |l| Repeat::Finite(l.into())))?;
         for img in &self.images {
             let frame = Frame::<'_> {
                 delay: self.delay / 10,
@@ -260,7 +255,7 @@ where
 /// # fn foo() -> Result<Gif, Error> {
 /// let paths = vec!["tests/ball/ball01.bmp", "tests/ball/ball02.bmp", "tests/ball/ball03.bmp"];
 /// let images = load_images(&paths);
-/// let gif = engiffen(&images, 10, Quantizer::NeuQuant(2))?;
+/// let gif = engiffen(&images, 10, Quantizer::NeuQuant(2), None)?;
 /// assert_eq!(gif.images.len(), 3);
 /// # Ok(gif)
 /// # }

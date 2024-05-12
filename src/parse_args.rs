@@ -143,10 +143,7 @@ pub fn parse_args(args: &[String]) -> Result<Args, ArgsError> {
     };
 
     let loop_count: Option<u16> = if let Some(loop_str) = matches.opt_str("l") {
-        match loop_str.parse::<u16>() {
-            Ok(val) if val > 0 => Some(val),
-            _ => None,
-        }
+        u16::from_str(&loop_str).ok()
     } else {
         None
     };
