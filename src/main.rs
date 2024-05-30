@@ -4,6 +4,7 @@ extern crate getopts;
 extern crate glob;
 extern crate image;
 extern crate rand;
+extern crate rand_distr;
 
 use parse_args::{parse_args, Args, Modifier, SourceImages};
 use std::fs::{read_dir, File};
@@ -15,9 +16,8 @@ use std::{env, fmt, process};
 #[cfg(feature = "globbing")]
 use self::glob::glob;
 
-use rand::distributions::exponential::Exp1;
-use rand::distributions::{IndependentSample, Range};
-use rand::Rng;
+use rand::{thread_rng, Rng};
+use rand_distr::{Distribution, Exp1, Uniform};
 
 mod parse_args;
 
@@ -143,17 +143,17 @@ fn reverse<T>(src: &mut [T]) {
 fn shuffle<T>(src: &mut [T]) {
     use std::cmp::{max, min};
 
-    let mut rng = rand::thread_rng();
+    let mut rng = thread_rng();
 
     let lenf = src.len() as f64;
 
     for n in 1..(src.len()) {
         let i = src.len() - n;
-        let Exp1(e) = rng.gen();
+        let e: f64 = rng.sample(Exp1);
         let frame_weight = i as f64 / lenf;
         if e * frame_weight > 0.5 {
-            let range = Range::new(max(i - i / 2, 0), min(src.len() - 1, i + i / 2));
-            let j = range.ind_sample(&mut rng);
+            let range = Uniform::new(max(i - i / 2, 0), min(src.len() - 1, i + i / 2));
+            let j = range.sample(&mut rng);
             src.swap(i, j);
         }
     }
