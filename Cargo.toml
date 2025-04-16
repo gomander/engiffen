@@ -31,8 +31,8 @@ gif = "~0.13"
 color_quant = "^1"
 getopts = "~0.2"
 rayon = "^1"
-rand = "~0.8"
-rand_distr = "~0.4"
+rand = "~0.9"
+rand_distr = "~0.5"
 fnv = "^1"
 glob = { version = "~0.3", optional = true }
 

@@ -171,7 +171,7 @@ impl Gif {
     /// # fn foo() -> Result<(), engiffen::Error> {
     /// # let images: Vec<Image> = vec![];
     /// let mut output = File::create("output.gif")?;
-    /// let gif = engiffen(&images, 10, Quantizer::NeuQuant(2))?;
+    /// let gif = engiffen(&images, 10, Quantizer::NeuQuant(2), None)?;
     /// gif.write(&mut output)?;
     /// # Ok(())
     /// # }
